@@ -1,3 +1,5 @@
+from enum import Enum
+
 import numba as nb
 import numpy as np
 
@@ -30,8 +32,9 @@ def refract(incident, normal, n1, n2):
         return True, refracted
 
 
-LIGHT_SOURCE = 0
-METAL = 1
+class Material(Enum):
+    LIGHT_SOURCE = 0
+    METAL = 1
 
 
 @nb.experimental.jitclass
@@ -39,7 +42,7 @@ class Sphere:
     center: nb.float64[::1]
     radius: nb.float64
     color: nb.float64[::1]
-    material: nb.int64
+    material: nb.typeof(Material.LIGHT_SOURCE)
 
     def __init__(self, center, radius, color, material):
         self.center = center

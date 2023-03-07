@@ -46,7 +46,7 @@ def ray_color(ray_direction, spheres, depth):
             break
 
         sphere = spheres[i]
-        if sphere.material == rt.LIGHT_SOURCE:  # hit light source
+        if sphere.material == rt.Material.LIGHT_SOURCE:  # hit light source
             pixel *= sphere.color
             break
 
@@ -86,7 +86,7 @@ spheres.append(
         np.array([0.0, 3.0, -10.0]),
         1.0,
         np.array([5.0, 5.0, 5.0]),
-        rt.LIGHT_SOURCE,
+        rt.Material.LIGHT_SOURCE,
     )
 )
 big_radius = 10000.0
@@ -95,7 +95,7 @@ spheres.append(
         np.array([0.0, -big_radius - 1, 0.0]),
         big_radius,
         np.array([0.7, 0.7, 0.7]),
-        rt.METAL,
+        rt.Material.METAL,
     )
 )
 spheres.append(
@@ -103,7 +103,7 @@ spheres.append(
         np.array([1.0, 1.0, -7.0]),
         1.0,
         np.array([0.7, 0.6, 0.5]),
-        rt.METAL,
+        rt.Material.METAL,
     )
 )
 spheres.append(
@@ -111,7 +111,7 @@ spheres.append(
         np.array([-1.0, 0.0, -6.0]),
         1.0,
         np.array([1.0, 1.0, 1.0]),
-        rt.METAL,
+        rt.Material.METAL,
     )
 )
 

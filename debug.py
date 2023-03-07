@@ -39,14 +39,14 @@ def ray_color(ray_direction, spheres, depth):
     pixel = np.ones(3, dtype=DTYPE)
 
     for _ in range(depth):
-        hit_something, t, i = rt.hit_many_spheres(ray_origin, ray_direction, spheres)
-        sphere = spheres[i]
+        t, i = rt.hit_many_spheres(ray_origin, ray_direction, spheres)
 
-        if not hit_something:  # hit background
+        if i == -1:  # hit background
             pixel *= background_color(ray_direction)
             break
 
-        if hit_something and sphere.material == rt.LIGHT_SOURCE:
+        sphere = spheres[i]
+        if sphere.material == rt.LIGHT_SOURCE:  # hit light source
             pixel *= sphere.color
             break
 

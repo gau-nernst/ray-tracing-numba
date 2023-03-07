@@ -72,14 +72,12 @@ def hit_sphere(ray_origin, ray_direction, sphere, t_min, t_max):
 
 @nb.njit
 def hit_many_spheres(ray_origin, ray_direction, spheres):
-    idx = 0
     t_max = INF
-    hit_something = False
+    idx = -1
     for i in range(len(spheres)):
         # shadow acne
         t = hit_sphere(ray_origin, ray_direction, spheres[i], 0.0001, t_max)
         if t < t_max:
             t_max = t
             idx = i
-            hit_something = True
-    return hit_something, t_max, idx
+    return t_max, idx

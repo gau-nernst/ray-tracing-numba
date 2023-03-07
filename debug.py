@@ -32,18 +32,42 @@ def to_ray_vector(x_ind, y_ind):
     return utils.normalize(ray_direction)
 
 
-@nb.njit(parallel=True)
-def program1(im):
-    ray_origin = np.zeros(3)
-    big_radius = 10000.0
-    radii = np.array([1.0, big_radius, 1.0, 1.0])
+@nb.njit
+def ray_color(ray_direction, spheres, emitted_colors, specular_reflectivity, depth):
+    ray_origin = np.zeros(3, dtype=DTYPE)
+    pixel = np.ones(3, dtype=DTYPE)
 
-    centers = np.array(
+    for _ in range(depth):
+        hit_something, t, i = utils.hit_many_spheres(ray_origin, ray_direction, spheres)
+
+        if not hit_something:  # hit background
+            pixel *= background_color(ray_direction)
+            break
+
+        if hit_something and np.linalg.norm(emitted_colors[i]) > 0:  # hit light-emitting object
+            pixel *= emitted_colors[i]
+            break
+
+        # scatter light
+        ray_origin += ray_direction * t
+        surface_normal = (ray_origin - spheres[i, :3]) / spheres[i, 3]
+        ray_direction = utils.reflect(ray_direction, surface_normal)
+        pixel *= specular_reflectivity[i]
+
+    return pixel
+
+
+@nb.njit(parallel=True)
+def program(img):
+    img_h, img_w = img.shape[:2]
+
+    big_radius = 10000.0
+    spheres = np.array(
         [
-            [0.0, 3.0, -10.0],
-            [0.0, -big_radius - 1, 0.0],
-            [1.0, 1.0, -7.0],
-            [-1.0, 0.0, -6.0],
+            [0.0, 3.0, -10.0, 1.0],
+            [0.0, -big_radius - 1, 0.0, big_radius],
+            [1.0, 1.0, -7.0, 1.0],
+            [-1.0, 0.0, -6.0, 1.0],
         ],
         dtype=DTYPE,
     )
@@ -70,44 +94,28 @@ def program1(im):
         dtype=DTYPE,
     )
 
-    for row_idx in range(HEIGHT):
+    etas = np.array([1.0, 1.0, 1.5, 1.0], dtype=DTYPE)
+
+    n_samples = 100
+    max_depth = 50
+    for row_idx in range(img_h):
         if row_idx % 50 == 0:
             print("row =", row_idx)
 
-        for col_idx in nb.prange(WIDTH):
-            ray_origin = np.zeros(3, dtype=DTYPE)
-            multiplier = np.ones(3, dtype=DTYPE)
-            ray_direction = to_ray_vector(col_idx, row_idx)
-
-            while True:
-                hit_something, t, i = utils.hit_many_spheres(
-                    ray_origin, ray_direction, centers, radii
+        for col_idx in nb.prange(img_w):
+            pixel = img[HEIGHT - 1 - row_idx, col_idx]
+            for _ in range(n_samples):
+                ray_direction = to_ray_vector(
+                    col_idx + np.random.rand(),
+                    row_idx + np.random.rand(),
                 )
-
-                if not hit_something:  # hit background
-                    im[HEIGHT - 1 - row_idx, col_idx, :] = (
-                        background_color(ray_direction) * multiplier
-                    )
-                    break
-
-                if (
-                    hit_something and utils.length2(emitted_colors[i]) > 0
-                ):  # hit light-emitting object
-                    im[HEIGHT - 1 - row_idx, col_idx, :] = (
-                        emitted_colors[i] * multiplier
-                    )
-                    break
-
-                # scatter light
-                ray_origin += ray_direction * t
-                surface_normal = (ray_origin - centers[i]) / radii[i]
-                ray_direction = utils.reflect(ray_direction, surface_normal)
-                multiplier *= specular_reflectivity[i]
+                pixel += ray_color(ray_direction, spheres, emitted_colors, specular_reflectivity, max_depth)
+            pixel /= n_samples
 
 
-im = np.empty((HEIGHT, WIDTH, 3))
+im = np.zeros((HEIGHT, WIDTH, 3))
 time0 = time.perf_counter()
-program1(im)
+program(im)
 print(time.perf_counter() - time0)
 
 im = (im * im * 255.999).astype(np.uint8)

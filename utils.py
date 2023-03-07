@@ -5,18 +5,8 @@ INF = 1e8
 
 
 @nb.njit
-def length2(v):
-    return v.dot(v)
-
-
-@nb.njit
-def length(v):
-    return np.sqrt(v.dot(v))
-
-
-@nb.njit
 def normalize(v):
-    return v / length(v)
+    return v / np.linalg.norm(v)
 
 
 @nb.njit
@@ -40,10 +30,10 @@ def refract(incident, normal, n1, n2):
 
 
 @nb.njit
-def hit_sphere(ray_origin, ray_direction, center, radius, t_min, t_max):
-    oc = ray_origin - center
+def hit_sphere(ray_origin, ray_direction, sphere, t_min, t_max):
+    oc = ray_origin - sphere[:3]
     qb = oc.dot(ray_direction)
-    qc = oc.dot(oc) - radius * radius
+    qc = oc.dot(oc) - sphere[3] * sphere[3]
     discriminant = qb * qb - qc
 
     if discriminant < 0:
@@ -62,12 +52,13 @@ def hit_sphere(ray_origin, ray_direction, center, radius, t_min, t_max):
 
 
 @nb.njit
-def hit_many_spheres(ray_origin, ray_direction, centers, radii):
+def hit_many_spheres(ray_origin, ray_direction, spheres):
     idx = 0
     t_max = INF
     hit_something = False
-    for i in range(centers.shape[0]):
-        t = hit_sphere(ray_origin, ray_direction, centers[i], radii[i], 0.0001, t_max)
+    for i in range(spheres.shape[0]):
+        # shadow acne
+        t = hit_sphere(ray_origin, ray_direction, spheres[i], 0.0001, t_max)
         if t < t_max:
             t_max = t
             idx = i

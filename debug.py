@@ -91,7 +91,7 @@ def program1(im):
                     break
 
                 if (
-                    hit_something and emitted_colors[i].dot(emitted_colors[i]) > 0
+                    hit_something and utils.length2(emitted_colors[i]) > 0
                 ):  # hit light-emitting object
                     im[HEIGHT - 1 - row_idx, col_idx, :] = (
                         emitted_colors[i] * multiplier

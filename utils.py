@@ -5,8 +5,18 @@ INF = 1e8
 
 
 @nb.njit
+def length2(v):
+    return v.dot(v)
+
+
+@nb.njit
+def length(v):
+    return np.sqrt(v.dot(v))
+
+
+@nb.njit
 def normalize(v):
-    return v / v.dot(v)
+    return v / length(v)
 
 
 @nb.njit

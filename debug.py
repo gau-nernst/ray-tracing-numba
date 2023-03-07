@@ -6,6 +6,7 @@ from PIL import Image
 
 import utils
 
+
 DTYPE = np.float64
 WIDTH = 1920
 HEIGHT = 1080
@@ -33,70 +34,36 @@ def to_ray_vector(x_ind, y_ind):
 
 
 @nb.njit
-def ray_color(ray_direction, spheres, emitted_colors, specular_reflectivity, depth):
+def ray_color(ray_direction, spheres, depth):
     ray_origin = np.zeros(3, dtype=DTYPE)
     pixel = np.ones(3, dtype=DTYPE)
 
     for _ in range(depth):
         hit_something, t, i = utils.hit_many_spheres(ray_origin, ray_direction, spheres)
+        sphere = spheres[i]
 
         if not hit_something:  # hit background
             pixel *= background_color(ray_direction)
             break
 
-        if hit_something and np.linalg.norm(emitted_colors[i]) > 0:  # hit light-emitting object
-            pixel *= emitted_colors[i]
+        if hit_something and sphere.material == utils.LIGHT_SOURCE:
+            pixel *= sphere.color
             break
 
         # scatter light
         ray_origin += ray_direction * t
-        surface_normal = (ray_origin - spheres[i, :3]) / spheres[i, 3]
+        surface_normal = (ray_origin - sphere.center) / sphere.radius
         ray_direction = utils.reflect(ray_direction, surface_normal)
-        pixel *= specular_reflectivity[i]
+        pixel *= sphere.color
 
     return pixel
 
 
 @nb.njit(parallel=True)
-def program(img):
+def program(img, spheres):
     img_h, img_w = img.shape[:2]
 
-    big_radius = 10000.0
-    spheres = np.array(
-        [
-            [0.0, 3.0, -10.0, 1.0],
-            [0.0, -big_radius - 1, 0.0, big_radius],
-            [1.0, 1.0, -7.0, 1.0],
-            [-1.0, 0.0, -6.0, 1.0],
-        ],
-        dtype=DTYPE,
-    )
-
-    # white > 1. although its direct value is clipped to 1, its attenuated reflections will be brighter
-    # black, will not emit any color on its own, just reflect color
-    emitted_colors = np.array(
-        [
-            [5.0, 5.0, 5.0],
-            [0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0],
-        ],
-        dtype=DTYPE,
-    )
-
-    specular_reflectivity = np.array(
-        [
-            [0.0, 0.0, 0.0],  # does not reflect light
-            [0.7, 0.7, 0.7],  # reflect all lights equally
-            [0.7, 0.6, 0.5],  # reflect more red than other colors
-            [1.0, 1.0, 1.0],  # full reflection
-        ],
-        dtype=DTYPE,
-    )
-
-    etas = np.array([1.0, 1.0, 1.5, 1.0], dtype=DTYPE)
-
-    n_samples = 100
+    n_samples = 10
     max_depth = 50
     for row_idx in range(img_h):
         if row_idx % 50 == 0:
@@ -109,14 +76,51 @@ def program(img):
                     col_idx + np.random.rand(),
                     row_idx + np.random.rand(),
                 )
-                pixel += ray_color(ray_direction, spheres, emitted_colors, specular_reflectivity, max_depth)
+                pixel += ray_color(ray_direction, spheres, max_depth)
             pixel /= n_samples
 
 
-im = np.zeros((HEIGHT, WIDTH, 3))
+img = np.zeros((HEIGHT, WIDTH, 3))
+big_radius = 10000.0
+
+
+spheres = nb.typed.List()
+spheres.append(
+    utils.Sphere(
+        np.array([0.0, 3.0, -10.0]),
+        1.0,
+        np.array([5.0, 5.0, 5.0]),
+        utils.LIGHT_SOURCE,
+    )
+)
+spheres.append(
+    utils.Sphere(
+        np.array([0.0, -big_radius - 1, 0.0]),
+        big_radius,
+        np.array([0.7, 0.7, 0.7]),
+        utils.METAL,
+    )
+)
+spheres.append(
+    utils.Sphere(
+        np.array([1.0, 1.0, -7.0]),
+        1.0,
+        np.array([0.7, 0.6, 0.5]),
+        utils.METAL,
+    )
+)
+spheres.append(
+    utils.Sphere(
+        np.array([-1.0, 0.0, -6.0]),
+        1.0,
+        np.array([1.0, 1.0, 1.0]),
+        utils.METAL,
+    )
+)
+
 time0 = time.perf_counter()
-program(im)
+program(img, spheres)
 print(time.perf_counter() - time0)
 
-im = (im * im * 255.999).astype(np.uint8)
-Image.fromarray(im).save("image.png")
+img = (img * img * 255.999).astype(np.uint8)
+Image.fromarray(img).save("image.png")

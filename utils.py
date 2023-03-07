@@ -1,15 +1,16 @@
 import numba as nb
 import numpy as np
 
+
 INF = 1e8
 
 
-@nb.njit
+@nb.njit(nb.float64[::1](nb.float64[::1]))
 def normalize(v):
     return v / np.linalg.norm(v)
 
 
-@nb.njit
+@nb.njit(nb.float64[::1](nb.float64[::1], nb.float64[::1]))
 def reflect(ray, normal):
     return ray - 2.0 * ray.dot(normal) * normal
 
@@ -29,11 +30,29 @@ def refract(incident, normal, n1, n2):
         return True, refracted
 
 
+LIGHT_SOURCE = 0
+METAL = 1
+
+
+@nb.experimental.jitclass
+class Sphere:
+    center: nb.float64[::1]
+    radius: nb.float64
+    color: nb.float64[::1]
+    material: nb.int64
+
+    def __init__(self, center, radius, color, material):
+        self.center = center
+        self.radius = radius
+        self.color = color
+        self.material = material
+
+
 @nb.njit
 def hit_sphere(ray_origin, ray_direction, sphere, t_min, t_max):
-    oc = ray_origin - sphere[:3]
+    oc = ray_origin - sphere.center
     qb = oc.dot(ray_direction)
-    qc = oc.dot(oc) - sphere[3] * sphere[3]
+    qc = oc.dot(oc) - sphere.radius * sphere.radius
     discriminant = qb * qb - qc
 
     if discriminant < 0:
@@ -56,7 +75,7 @@ def hit_many_spheres(ray_origin, ray_direction, spheres):
     idx = 0
     t_max = INF
     hit_something = False
-    for i in range(spheres.shape[0]):
+    for i in range(len(spheres)):
         # shadow acne
         t = hit_sphere(ray_origin, ray_direction, spheres[i], 0.0001, t_max)
         if t < t_max:
